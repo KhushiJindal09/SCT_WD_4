@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hi-Fi To-Do App with Sort, Search, Export</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet" />
+  <style>
+    body {
+      background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+      min-height: 100vh;
+      color: #ecf0f1;
+    }
+    .task-card {
+      backdrop-filter: blur(10px);
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 15px;
+      transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+    .task-card:hover {
+      transform: translateY(-8px);
+      background: rgba(255, 255, 255, 0.15);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    }
+    .completed-task {
+      opacity: 0.6;
+      text-decoration: line-through;
+    }
+    input:focus, select:focus, button:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.5);
+      border-color: #3498db;
+    }
+    .list-banner {
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 2rem;
+    }
+    .list-banner::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(45deg, rgba(142, 68, 173, 0.5), rgba(241, 196, 15, 0.5));
+      filter: blur(50px);
+      z-index: 0;
+      border-radius: 15px;
+    }
+    .list-content {
+      position: relative;
+      z-index: 1;
+    }
+    .edit-btn {
+      color: #fff !important;
+      background-color: #fbbf24 !important;
+    }
+    .edit-btn:hover {
+      background-color: #f59e0b !important;
+    }
+    /* Custom confirmation modal styles */
+    #confirm-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    #confirm-modal.show {
+      visibility: visible;
+      opacity: 1;
+    }
+    #confirm-box {
+      background: white;
+      color: #333;
+      padding: 2rem;
+      border-radius: 1rem;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      text-align: center;
+    }
+    #confirm-message {
+      margin-bottom: 1.5rem;
+      font-size: 1.125rem;
+    }
+    #confirm-buttons button {
+      margin: 0 0.5rem;
+      padding: 0.5rem 1.5rem;
+      border-radius: 0.5rem;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    #confirm-yes {
+      background-color: #ef4444; /* red-500 */
+      color: white;
+    }
+    #confirm-yes:hover {
+      background-color: #dc2626; /* red-600 */
+    }
+    #confirm-no {
+      background-color: #9ca3af; /* gray-400 */
+      color: white;
+    }
+    #confirm-no:hover {
+      background-color: #6b7280; /* gray-600 */
+    }
+
+    /* Improved Edit Modal Styles for better visibility */
+    #edit-modal > div {
+      background: #1f2937; /* dark slate gray */
+      color: #f9fafb; /* very light gray */
+      box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+    }
+
+    #edit-modal input[type="text"],
+    #edit-modal input[type="datetime-local"],
+    #edit-modal select {
+      background-color: #374151; /* dark gray */
+      color: #f9fafb; /* light text */
+      border: 1px solid #4b5563; /* medium gray border */
+    }
+
+    #edit-modal input[type="text"]::placeholder,
+    #edit-modal input[type="datetime-local"]::placeholder {
+      color: #9ca3af; /* lighter gray placeholder */
+    }
+
+    #edit-modal input[type="text"]:focus,
+    #edit-modal input[type="datetime-local"]:focus,
+    #edit-modal select:focus {
+      border-color: #3b82f6; /* blue border on focus */
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+      background-color: #1e40af; /* darker blue background on focus */
+      color: #f9fafb;
+    }
+  </style>
+</head>
+<body class="font-sans antialiased">
+  <div class="container mx-auto px-6 py-12 max-w-6xl">
+    <header class="text-center mb-6 animate-pulse">
+      <h1 class="text-5xl font-bold text-white mb-4 tracking-wide">Elite To-Do Platform</h1>
+      <p class="text-xl text-blue-200 italic">Master your tasks with style and efficiency</p>
+    </header>
+
+    <!-- Global Controls -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+      <input type="text" id="global-search" placeholder="Search tasks..." class="p-3 rounded-lg w-full md:w-1/3 bg-white bg-opacity-20 text-white placeholder-blue-200 border border-white border-opacity-30 focus:bg-opacity-30" />
+      <select id="global-sort" class="p-3 rounded-lg w-full md:w-1/4 bg-gray-800 text-white border border-white border-opacity-30 focus:bg-gray-900 focus:border-blue-500">
+        <option value="default">Sort by</option>
+        <option value="title-asc">Title A-Z</option>
+        <option value="title-desc">Title Z-A</option>
+        <option value="priority-asc">Priority Low-High</option>
+        <option value="priority-desc">Priority High-Low</option>
+        <option value="deadline-asc">Deadline Earliest</option>
+        <option value="deadline-desc">Deadline Latest</option>
+        <option value="completed">Completed First</option>
+        <option value="incomplete">Incomplete First</option>
+      </select>
+      <button id="export-btn" class="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-pink-500 hover:to-purple-500 text-white font-bold px-6 py-3 rounded-full transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-2 justify-center">
+        <i class="fas fa-file-export"></i> Export Tasks
+      </button>
+    </div>
+
+    <div id="lists-container" class="space-y-6"></div>
+
+    <div class="text-center mb-12">
+      <button id="create-list-btn" class="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-pink-500 hover:to-purple-500 text-white font-bold px-6 py-3 rounded-full transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105">
+        <i class="fas fa-layer-group mr-2"></i>Create New List
+      </button>
+    </div>
+
+    <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+      <div class="rounded-2xl p-8 w-full max-w-lg mx-4">
+        <h3 class="text-2xl font-bold mb-6">Edit Task</h3>
+        <input type="text" id="edit-title" class="w-full p-4 mb-4 rounded-lg focus:ring-4" placeholder="Task title" />
+        <input type="datetime-local" id="edit-deadline" class="w-full p-4 mb-4 rounded-lg focus:ring-4" />
+        <select id="edit-priority" class="w-full p-4 mb-6 rounded-lg focus:ring-4">
+          <option value="low">Low Priority</option>
+          <option value="medium">Medium Priority</option>
+          <option value="high">High Priority</option>
+        </select>
+        <div class="flex justify-end space-x-4">
+          <button id="save-edit" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition duration-300">Save Changes</button>
+          <button id="cancel-edit" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition duration-300">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Custom Confirmation Modal -->
+    <div id="confirm-modal">
+      <div id="confirm-box">
+        <div id="confirm-message">Are you sure?</div>
+        <div id="confirm-buttons">
+          <button id="confirm-yes">Yes</button>
+          <button id="confirm-no">No</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src = "task4.js"> </script>
+</body>
+</html>
